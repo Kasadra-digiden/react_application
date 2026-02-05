@@ -1,114 +1,80 @@
-name: Deploy React App to EKS
- 
-on:
+name: Build React App Artifact
 
-  workflow_dispatch: 
+on:
+  workflow_dispatch:
 
 jobs:
-
-  deploy: 
-   
-
+  build:
     runs-on: ubuntu-latest
- 
+
     steps:
-
       - name: Checkout code
-
         uses: actions/checkout@v4
- 
+
       - name: Set up Node.js
-
         uses: actions/setup-node@v4
-
         with:
-
           node-version: 18
- 
+
       - name: Install dependencies
-
         working-directory: To-Do-List
-
         run: npm install
- 
-      - name: SonarQube Scan
 
-        uses: sonarsource/sonarqube-scan-action@v2
-
-        with:
-
-          projectBaseDir: To-Do-List
-
-          args: '-Dsonar.projectKey=React -Dsonar.sources=src -Dsonar.tests=src -Dsonar.test.inclusions=**/*.test.js -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'
-
-        env:
-
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
- 
- 
-      - name: Configure AWS credentials
-
-        uses: aws-actions/configure-aws-credentials@v4
-
-        with:
-
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-          aws-region: ${{ secrets.AWS_REGION }}
- 
-      - name: Login to Amazon ECR
-
-        run: |
-
-          aws ecr get-login-password \
-
-          | docker login \
-
-            --username AWS \
-
-            --password-stdin \
-
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-
-      - name: Build Docker image
-
+      - name: Build React app (Vite)
         working-directory: To-Do-List
+        run: npm run build
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-vite-build
+          path: To-Do-List/dist
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        with:
+          projectBaseDir: To-Do-List
+          args: '-Dsonar.projectKey=React -Dsonar.sources=src -Dsonar.tests=src -Dsonar.test.inclusions=**/*.test.js -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
         run: |
-
+          aws ecr get-login-password \
+          | docker login \
+            --username AWS \
+            --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      
+      - name: Build Docker image
+        working-directory: To-Do-List
+        run: |
           docker build -t todo-react-app .
-
+      
       - name: Tag & Push image to ECR
-
         run: |
-
           docker tag todo-react-app:latest \
-
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:latest
-
           docker push \
-
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:latest
-
+      
       - name: Update kubeconfig
-
         run: |
-
           aws eks update-kubeconfig \
-
             --region ${{ secrets.AWS_REGION }} \
-
             --name ${{ secrets.EKS_CLUSTER_NAME }}
-
+      
       - name: Deploy to EKS
-
         run: kubectl apply -f ../react-deployment.yaml
-
         working-directory: To-Do-List   
- 
+
   
- 
