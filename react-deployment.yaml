@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: react
-          image: 088310115913.dkr.ecr.us-east-1.amazonaws.com/demo-space:latest
+          image: 150736876120.dkr.ecr.us-east-1.amazonaws.com/demo-repo:latest
           ports:
             - containerPort: 80
 ---
